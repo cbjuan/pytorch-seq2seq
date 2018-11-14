@@ -66,15 +66,16 @@ class DecoderRNN(BaseRNN):
     KEY_SEQUENCE = 'sequence'
 
     def __init__(self, vocab_size, max_len, hidden_size,
-            sos_id, eos_id,
-            n_layers=1, rnn_cell='gru', bidirectional=False,
-            input_dropout_p=0, dropout_p=0, use_attention=False):
+                 sos_id, eos_id,
+                 n_layers=1, rnn_cell='gru', bidirectional=False,
+                 input_dropout_p=0, dropout_p=0, use_attention=False):
         super(DecoderRNN, self).__init__(vocab_size, max_len, hidden_size,
-                input_dropout_p, dropout_p,
-                n_layers, rnn_cell)
+                                         input_dropout_p, dropout_p,
+                                         n_layers, rnn_cell)
 
         self.bidirectional_encoder = bidirectional
-        self.rnn = self.rnn_cell(hidden_size, hidden_size, n_layers, batch_first=True, dropout=dropout_p)
+        self.rnn = self.rnn_cell(
+            hidden_size, hidden_size, n_layers, batch_first=True, dropout=dropout_p)
 
         self.output_size = vocab_size
         self.max_length = max_len
@@ -102,11 +103,12 @@ class DecoderRNN(BaseRNN):
         if self.use_attention:
             output, attn = self.attention(output, encoder_outputs)
 
-        predicted_softmax = function(self.out(output.contiguous().view(-1, self.hidden_size))).view(batch_size, output_size, -1)
+        predicted_softmax = function(self.out(output.contiguous(
+        ).view(-1, self.hidden_size)), dim=1).view(batch_size, output_size, -1)
         return predicted_softmax, hidden, attn
 
     def forward(self, inputs=None, encoder_hidden=None, encoder_outputs=None,
-                    function=F.log_softmax, teacher_forcing_ratio=0):
+                function=F.log_softmax, teacher_forcing_ratio=0):
         ret_dict = dict()
         if self.use_attention:
             ret_dict[DecoderRNN.KEY_ATTN_SCORE] = list()
@@ -153,7 +155,7 @@ class DecoderRNN(BaseRNN):
             decoder_input = inputs[:, 0].unsqueeze(1)
             for di in range(max_length):
                 decoder_output, decoder_hidden, step_attn = self.forward_step(decoder_input, decoder_hidden, encoder_outputs,
-                                                                         function=function)
+                                                                              function=function)
                 step_output = decoder_output.squeeze(1)
                 symbols = decode(di, step_output, step_attn)
                 decoder_input = symbols
@@ -168,7 +170,8 @@ class DecoderRNN(BaseRNN):
         if encoder_hidden is None:
             return None
         if isinstance(encoder_hidden, tuple):
-            encoder_hidden = tuple([self._cat_directions(h) for h in encoder_hidden])
+            encoder_hidden = tuple([self._cat_directions(h)
+                                    for h in encoder_hidden])
         else:
             encoder_hidden = self._cat_directions(encoder_hidden)
         return encoder_hidden
@@ -184,7 +187,8 @@ class DecoderRNN(BaseRNN):
     def _validate_args(self, inputs, encoder_hidden, encoder_outputs, function, teacher_forcing_ratio):
         if self.use_attention:
             if encoder_outputs is None:
-                raise ValueError("Argument encoder_outputs cannot be None when attention is used.")
+                raise ValueError(
+                    "Argument encoder_outputs cannot be None when attention is used.")
 
         # inference batch size
         if inputs is None and encoder_hidden is None:
@@ -201,13 +205,15 @@ class DecoderRNN(BaseRNN):
         # set default input and max decoding length
         if inputs is None:
             if teacher_forcing_ratio > 0:
-                raise ValueError("Teacher forcing has to be disabled (set 0) when no inputs is provided.")
-            inputs = Variable(torch.LongTensor([self.sos_id] * batch_size),
-                                    volatile=True).view(batch_size, 1)
+                raise ValueError(
+                    "Teacher forcing has to be disabled (set 0) when no inputs is provided.")
+            inputs = torch.LongTensor(
+                [self.sos_id] * batch_size).view(batch_size, 1)
             if torch.cuda.is_available():
                 inputs = inputs.cuda()
             max_length = self.max_length
         else:
-            max_length = inputs.size(1) - 1 # minus the start of sequence symbol
+            # minus the start of sequence symbol
+            max_length = inputs.size(1) - 1
 
         return inputs, batch_size, max_length
